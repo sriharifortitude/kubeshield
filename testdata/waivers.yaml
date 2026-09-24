@@ -1,0 +1,13 @@
+waivers:
+  - rule: run-as-root
+    kind: Pod
+    namespace: prod
+    name: legacy-worker
+    reason: pre-dates the policy, migration ticket JIRA-1
+    expires: "2030-01-01"
+  - rule: host-namespace
+    kind: Pod
+    namespace: prod
+    name: debug-tool
+    reason: was meant to be temporary while the sidecar proxy was being set up
+    expires: "2025-01-01"
