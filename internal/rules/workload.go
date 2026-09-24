@@ -108,8 +108,7 @@ func (r runAsRoot) Check(resources []manifest.Resource) []Finding {
 	return eachContainer(resources, r.ID(), r.Severity(),
 		"set securityContext.runAsNonRoot: true (at the container or pod level)",
 		func(pod manifest.Resource, c manifest.Container) (bool, string) {
-			sc := containerSecurityContext(pod, c)
-			nonRoot, known := manifest.NestedBool(sc, "runAsNonRoot")
+			nonRoot, known := effectiveBool(pod, c, "runAsNonRoot")
 			if known && nonRoot {
 				return false, ""
 			}

@@ -152,6 +152,30 @@ spec:
 	}
 }
 
+// Regression test for a real false positive: grainops' Helm chart sets
+// runAsNonRoot at the pod level and other fields (allowPrivilegeEscalation,
+// readOnlyRootFilesystem) on the container itself. An earlier
+// implementation picked the container's securityContext map as a whole
+// the moment it existed at all, and so stopped looking at the pod's
+// runAsNonRoot the moment the container set anything of its own --
+// Kubernetes actually merges every securityContext field independently.
+func TestRunAsRootMergesPerFieldNotPerWholeSecurityContextMap(t *testing.T) {
+	got := check(t, "run-as-root", `
+kind: Pod
+apiVersion: v1
+metadata: {name: web}
+spec:
+  securityContext: {runAsNonRoot: true}
+  containers:
+    - name: app
+      image: example/app:1.0
+      securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true}
+`)
+	if len(got) != 0 {
+		t.Fatalf("got %d findings, want 0: the pod-level runAsNonRoot must still apply to a container with its own (partial) securityContext: %+v", len(got), got)
+	}
+}
+
 func TestReadOnlyRootFilesystemMissing(t *testing.T) {
 	bad := check(t, "read-only-root-filesystem-missing", `
 kind: Pod
