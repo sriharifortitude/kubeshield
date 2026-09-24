@@ -103,16 +103,26 @@ func eachContainer(resources []manifest.Resource, id string, severity Severity, 
 	return out
 }
 
-// containerSecurityContext returns the container's own securityContext
-// map, falling back to the pod-level one (spec.securityContext) when the
-// container has none -- Kubernetes applies the same fallback when
-// deciding the effective value of a field like runAsNonRoot.
-func containerSecurityContext(pod manifest.Resource, c manifest.Container) map[string]any {
+// effectiveBool reads a field that Kubernetes resolves by merging the
+// container's securityContext with the pod's *per field*, not by
+// preferring one whole map over the other: a container can set
+// allowPrivilegeEscalation of its own while still inheriting
+// runAsNonRoot from the pod. Looking up the container's whole
+// securityContext map first and only falling back to the pod's when the
+// container has none at all -- the obvious-looking first draft of this
+// -- silently stops seeing the pod-level value the moment a container
+// sets any field of its own, which produced a false positive on a real
+// chart (grainops' eventgrain Deployment) before this was caught.
+func effectiveBool(pod manifest.Resource, c manifest.Container, field string) (value bool, known bool) {
 	if sc, ok := manifest.NestedMap(c.Raw, "securityContext"); ok {
-		return sc
+		if v, ok := manifest.NestedBool(sc, field); ok {
+			return v, true
+		}
 	}
 	if sc, ok := manifest.NestedMap(pod.PodSpec, "securityContext"); ok {
-		return sc
+		if v, ok := manifest.NestedBool(sc, field); ok {
+			return v, true
+		}
 	}
-	return nil
+	return false, false
 }
